@@ -386,7 +386,7 @@ footer:
   # 页脚第一行文字的 HTML，建议保留 Fluid 的链接，用于向更多人推广本主题
   # HTML of the first line of the footer, it is recommended to keep the Fluid link to promote this theme to more people
   content: '
-    <span>BY KUAN</span>
+    <span>By KUAN</span>
     <span style="margin: 0 3px;">|</span>
     Published with <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a>
     <span style="margin: 0 3px;">|</span>

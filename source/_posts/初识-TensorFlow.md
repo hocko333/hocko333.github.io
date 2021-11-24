@@ -1,6 +1,7 @@
 ---
 title: 初识 TensorFlow
 date: 2021-10-30 09:49:38
+categories: 机器学习
 tags: [TensorFlow, 机器学习, 神经网络]
 banner_img_height: 30
 ---
