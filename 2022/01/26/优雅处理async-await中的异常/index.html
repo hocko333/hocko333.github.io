@@ -1,0 +1,555 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/favicon1.png">
+  <link rel="icon" href="/img/favicon1.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="description" content="">
+  <meta name="author" content="Kuan">
+  <meta name="keywords" content="">
+  <meta name="description" content="优雅处理 async&#x2F;await 中的异常前言在开发中，你是否会为了代码鲁棒性，亦或者是为了捕获异步的错误，而频繁的在 async 函数中写 try&#x2F;catch 的逻辑？ 1234567async function func() &amp;#123;  try &amp;#123;    let res &#x3D; await asyncFunc()  &amp;#125; catch (e) &amp;#123;    &#x2F;&#x2F;.....">
+<meta property="og:type" content="article">
+<meta property="og:title" content="优雅处理 async&#x2F;await 中的异常">
+<meta property="og:url" content="http://example.com/2022/01/26/%E4%BC%98%E9%9B%85%E5%A4%84%E7%90%86async-await%E4%B8%AD%E7%9A%84%E5%BC%82%E5%B8%B8/index.html">
+<meta property="og:site_name" content="KUAN">
+<meta property="og:description" content="优雅处理 async&#x2F;await 中的异常前言在开发中，你是否会为了代码鲁棒性，亦或者是为了捕获异步的错误，而频繁的在 async 函数中写 try&#x2F;catch 的逻辑？ 1234567async function func() &amp;#123;  try &amp;#123;    let res &#x3D; await asyncFunc()  &amp;#125; catch (e) &amp;#123;    &#x2F;&#x2F;.....">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://example.com/img/post-async-await/error_captured.webp">
+<meta property="og:image" content="http://example.com/img/post-async-await/ast-1.webp">
+<meta property="og:image" content="http://example.com/img/post-async-await/ast-2.webp">
+<meta property="og:image" content="http://example.com/img/post-async-await/ast-3.webp">
+<meta property="og:image" content="http://example.com/img/post-async-await/ast-4.webp">
+<meta property="og:image" content="http://example.com/img/post-async-await/code-1.webp">
+<meta property="og:image" content="http://example.com/img/post-async-await/ast-5.webp">
+<meta property="og:image" content="http://example.com/img/post-async-await/code-2.webp">
+<meta property="og:image" content="http://example.com/img/post-async-await/ast-6.webp">
+<meta property="article:published_time" content="2022-01-26T10:07:40.000Z">
+<meta property="article:modified_time" content="2022-01-27T03:16:24.363Z">
+<meta property="article:author" content="Kuan">
+<meta property="article:tag" content="JavaScript">
+<meta property="article:tag" content="Webpack">
+<meta property="article:tag" content="AST">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="http://example.com/img/post-async-await/error_captured.webp">
+  
+  <title>优雅处理 async/await 中的异常 - KUAN</title>
+
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4/dist/css/bootstrap.min.css" />
+
+
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@4/github-markdown.min.css" />
+  <link  rel="stylesheet" href="/lib/hint/hint.min.css" />
+
+  
+    
+    
+      
+      <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@10/styles/github-gist.min.css" />
+    
+  
+
+  
+    <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3/dist/jquery.fancybox.min.css" />
+  
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_ba1fz6golrf.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_kmeydafke9r.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+<!-- 自定义样式保持在最底部 -->
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    var CONFIG = {"hostname":"example.com","root":"/","version":"1.8.12","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"right","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"copy_btn":true,"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname"}},"search_path":"/local-search.xml"};
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+
+<body>
+  <header style="height: 30vh;">
+    <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>KUAN&#39;s BLOG</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                首页
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                归档
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                分类
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                标签
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" target="_blank" rel="noopener" href="https://hocko333.github.io/resume/">
+                <i class="iconfont icon-user-fill"></i>
+                程宽的简历
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" target="_blank" rel="noopener" href="https://github.com/hocko333">
+                <i class="iconfont icon-github-fill"></i>
+                
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              &nbsp;<i class="iconfont icon-search"></i>&nbsp;
+            </a>
+          </li>
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">&nbsp;<i
+                class="iconfont icon-dark" id="color-toggle-icon"></i>&nbsp;</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div class="banner" id="banner" parallax=true
+         style="background: url('/img/post_banner.jpg') no-repeat center center;
+           background-size: cover;">
+      <div class="full-bg-img">
+        <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+          <div class="page-header text-center fade-in-up">
+            <span class="h2" id="subtitle" title="优雅处理 async/await 中的异常">
+              
+            </span>
+
+            
+              <div class="mt-3">
+  
+  
+    <span class="post-meta">
+      <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+      <time datetime="2022-01-26 18:07" pubdate>
+        2022年1月26日 晚上
+      </time>
+    </span>
+  
+</div>
+
+<div class="mt-1">
+  
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-chart"></i>
+      7.2k 字
+    </span>
+  
+
+  
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-clock-fill"></i>
+      
+      
+      22 分钟
+    </span>
+  
+
+  
+  
+</div>
+
+            
+          </div>
+
+          
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="d-none d-lg-block col-lg-2"></div>
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div class="py-5" id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">优雅处理 async/await 中的异常</h1>
+            
+            <div class="markdown-body">
+              <h1 id="优雅处理-async-await-中的异常"><a href="#优雅处理-async-await-中的异常" class="headerlink" title="优雅处理 async/await 中的异常"></a>优雅处理 async/await 中的异常</h1><h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>在开发中，你是否会为了代码鲁棒性，亦或者是为了捕获异步的错误，而频繁的在 <code>async</code> 函数中写 <code>try/catch</code> 的逻辑？</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">func</span>(<span class="hljs-params"></span>) </span>&#123;<br>  <span class="hljs-keyword">try</span> &#123;<br>    <span class="hljs-keyword">let</span> res = <span class="hljs-keyword">await</span> asyncFunc()<br>  &#125; <span class="hljs-keyword">catch</span> (e) &#123;<br>    <span class="hljs-comment">//......</span><br>  &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>曾有人提过这样一个处理 <code>async/await</code> 的方法</p>
+<p><img src="/img/post-async-await/error_captured.webp" srcset="/img/loading.gif" lazyload alt="errorCaptured"></p>
+<p>这样我们就可以使用一个辅助函数包裹这个 <code>async</code> 函数实现错误捕获</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">func</span>(<span class="hljs-params"></span>) </span>&#123;<br>  <span class="hljs-keyword">let</span> [err, res] = <span class="hljs-keyword">await</span> errorCaptured(asyncFunc)<br>  <span class="hljs-keyword">if</span> (err) &#123;<br>    <span class="hljs-comment">//... 错误捕获</span><br>  &#125;<br>  <span class="hljs-comment">//...</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>但是这么做有一个缺陷就是每次使用的时候，都要引入 <code>errorCaptured</code> 这个辅助函数，有没有“懒”的方法呢？</p>
+<p>答案肯定是有的，可以通过一个 <code>webpack loader</code> 来自动注入 <code>try/catch</code> 代码，最后的结果希望是这样的</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-comment">// development</span><br><span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">func</span>(<span class="hljs-params"></span>) </span>&#123;<br>  <span class="hljs-keyword">let</span> res = <span class="hljs-keyword">await</span> asyncFunc()<br>  <span class="hljs-comment">//...其他逻辑</span><br>&#125;<br><br><span class="hljs-comment">// release</span><br><span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">func</span>(<span class="hljs-params"></span>) </span>&#123;<br>  <span class="hljs-keyword">try</span> &#123;<br>    <span class="hljs-keyword">let</span> res = <span class="hljs-keyword">await</span> asyncFunc()<br>  &#125; <span class="hljs-keyword">catch</span> (e) &#123;<br>    <span class="hljs-comment">//......</span><br>  &#125;<br>  <span class="hljs-comment">//...其他逻辑</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>是不是很棒？在开发环境中不需要任何多余的代码，让 <code>webpack</code> 自动给生产环境的代码注入错误捕获的逻辑，接下来我们来逐步实现这个 <code>loader</code></p>
+<h2 id="loader-原理"><a href="#loader-原理" class="headerlink" title="loader 原理"></a>loader 原理</h2><p>在实现这个 <code>webpack loader</code> 之前，先简要介绍一下 <code>loader</code> 的原理，我们在 <code>webpack</code> 中定义的一个 <code>loader</code>，本质上只是一个函数，在定义 <code>loader</code> 同时还会定义一个 <code>test</code> 属性，<code>webpack</code> 会遍历所有的模块名，当匹配 <code>test</code> 属性定义的正则时，会将这个模块作为 <code>source</code> 参数传入 <code>loader</code> 中执行</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript">&#123;<br>  <span class="hljs-attr">test</span>: <span class="hljs-regexp">/\.vue$/</span>,<br>  use: <span class="hljs-string">&quot;vue-loader&quot;</span>,<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>当匹配到 <code>.vue</code> 结尾的文件名时，会将文件作为 <code>source</code> 参数传给 <code>vue-loader</code>，<code>use</code> 属性后面可以是一个字符串也可以是一个路径，当是字符串时默认会视为 <code>nodejs 模块</code>，去 <code>node_modules</code> 中找</p>
+<p>而这些文件本质上其实就是字符串（图片、视频就是 Buffer 对象），以 <code>vue-loader</code> 为例，当 <code>loader</code> 接受到文件时，通过字符串匹配将其分为 3 份，模版部分会被 <code>vue-loader</code> 编译为 <code>render</code> 函数，<code>script</code> 部分会交给 <code>babel-loader</code>，<code>style</code> 部分会交给 <code>css-loader</code>，同时 <code>loader</code> 遵守单一原则，即一个 <code>loader</code> 只做一件事，这样可以灵活组合多个 <code>loader</code>，互不干扰</p>
+<h2 id="实现思路"><a href="#实现思路" class="headerlink" title="实现思路"></a>实现思路</h2><p>因为 <code>loader</code> 可以读取匹配到的文件，经过处理变成期望的输出结果，所以我们可以自己实现一个 <code>loader</code>，接受 <code>js</code> 文件，当遇到 <code>await</code> 关键字时，给代码包裹一层 <code>try/catch</code></p>
+<p>那么如何能够准确给 <code>await</code> 及后面的表达式包裹 <code>try/catch</code> 呢？这里需要用到<code>抽象语法树（AST）</code>相关的知识</p>
+<h2 id="AST"><a href="#AST" class="headerlink" title="AST"></a>AST</h2><blockquote>
+<p>抽象语法树是源代码语法结构的一种抽象表示。它以树状的形式表现编程语言的语法结构，树上的每个节点都表示源代码中的一种结构</p>
+</blockquote>
+<p>通过 <code>AST</code> 可以实现很多非常有用的功能，例如将 <code>ES6+</code> 的代码转为 <code>ES5</code>，<code>eslint</code> 的检查，代码美化，甚至 js 引擎都是依赖 <code>AST</code> 实现的，同时因为代码本质只是单纯的字符串，所以并不仅限于 <code>js</code> 之间的转换，<code>scss</code>，<code>less</code> 等 <code>css</code> 预处理器也是通过 <code>AST</code> 转为浏览器认识的 <code>css</code> 代码，我们来举个例子</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">let</span> a = <span class="hljs-number">1</span><br><span class="hljs-keyword">let</span> b = a + <span class="hljs-number">5</span><br></code></pre></td></tr></table></figure>
+
+<p>将其转换为抽象语法树后是这样的</p>
+<p><img src="/img/post-async-await/ast-1.webp" srcset="/img/loading.gif" lazyload alt="AST 01"></p>
+<p>将字符串转为 <code>AST</code> 树需要经过词法分析和语法分析两步</p>
+<p>词法分析将一个个代码片段转为 <code>token</code>（词法单元），去除空格注释，例如第一行会将 <code>let</code>，<code>a</code>，<code>=</code>，<code>1</code> 这 4 个转为 <code>token</code>，<code>token</code> 是一个对象，描述了代码片段在整个代码中的位置和记录当前值的一些信息</p>
+<p><img src="/img/post-async-await/ast-2.webp" srcset="/img/loading.gif" lazyload alt="AST 02"></p>
+<p>语法分析会将 <code>token</code> 结合当前语言<code>（JS）</code>的语法转换成 <code>Node（节点）</code>，同时 <code>Node</code> 包含一个 <code>type</code> 属性记录当前的类型，例如 <code>let</code> 在 <code>JS</code> 中代表着一个变量声明的关键字，所以它的 <code>type</code> 为 <code>VariableDeclaration</code>，而 <code>a = 1</code> 会作为 <code>let</code> 的声明描述，它的 <code>type</code> 为 <code>VariableDeclarator</code>，而声明描述是依赖于变量声明的，所以是一种上下的层级关系</p>
+<p>另外可以发现并不是一个 <code>token</code> 对应一个 <code>Node</code>，等号左右必须都有值才能组成一个声明语句，否则会作出警告，这就是 <code>eslint</code> 的基本原理。最后所有的 <code>Node</code> 组合在一起就形成了 <code>AST 语法树</code></p>
+<p><strong>推荐一个很实用的 AST 查看工具，<a target="_blank" rel="noopener" href="https://astexplorer.net/#/Z1exs6BWMq">AST explorer</a>，更直观的查看代码是如何转为抽象语法树</strong></p>
+<p>回到代码的实现，我们只需要通过 <code>AST 树</code>找到 <code>await 表达式</code>，将 <code>await</code> 外面包裹一层 <code>try/catch</code> 的 Node 节点即可</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">func</span>(<span class="hljs-params"></span>) </span>&#123;<br>  <span class="hljs-keyword">await</span> asyncFunc()<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>对应 AST 树：</p>
+<p><img src="/img/post-async-await/ast-3.webp" srcset="/img/loading.gif" lazyload alt="AST 03"></p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">func</span>(<span class="hljs-params"></span>) </span>&#123;<br>  <span class="hljs-keyword">try</span> &#123;<br>    <span class="hljs-keyword">await</span> asyncFunc()<br>  &#125; <span class="hljs-keyword">catch</span> (e) &#123;<br>    <span class="hljs-built_in">console</span>.log(e)<br>  &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>对应 AST 树：</p>
+<p><img src="/img/post-async-await/ast-4.webp" srcset="/img/loading.gif" lazyload alt="AST 04"></p>
+<h2 id="loader-开发"><a href="#loader-开发" class="headerlink" title="loader 开发"></a>loader 开发</h2><p>有了具体的思路，接下来我们开始编写 <code>loader</code>，当我们的 <code>loader</code> 接收到 <code>source</code> 文件时，通过 <code>@babel/parser</code><br>这个包可以将文件转换为 AST 抽象语法树，那么如何找到对应的 <code>await</code> 表达式呢？</p>
+<p>这就需要另外一个 <code>babel</code> 的包 <code>@babel/traverse</code>，通过 <code>@babel/traverse</code> 可以传入一个 AST 树和一些钩子函数，随后深度遍历传入的 AST 树，当遍历的节点和钩子函数的名字相同时，会执行对应的回调</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">const</span> parser = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/parser&quot;</span>)<br><span class="hljs-keyword">const</span> traverse = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/traverse&quot;</span>).default<br><br><span class="hljs-built_in">module</span>.exports = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">source</span>) </span>&#123;<br>  <span class="hljs-keyword">let</span> ast = parser.parse(source)<br><br>  traverse(ast, &#123;<br>    <span class="hljs-function"><span class="hljs-title">AwaitExpression</span>(<span class="hljs-params">path</span>)</span> &#123;<br>      <span class="hljs-comment">//...</span><br>    &#125;<br>  &#125;)<br>  <span class="hljs-comment">//...</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>通过 <code>@babel/traverse</code> 我们能够轻松的找到 <code>await</code> 表达式对应的 Node 节点，接下来就是创建一个类型为 <code>TryStatement</code> 的 Node 节点，最后 <code>await</code> 放入其中。这里还需要依赖另外一个包 <code>@babel/types</code>，可以理解为 babel 版的 loadsh 库，它提供了很多和 AST 的 Node 节点相关的辅助函数，我们需要用到其中的 <code>tryStatement</code> 方法，即创建一个 <code>TryStatement</code> 的 Node 节点</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">const</span> parser = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/parser&quot;</span>)<br><span class="hljs-keyword">const</span> traverse = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/traverse&quot;</span>).default<br><span class="hljs-keyword">const</span> t = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/types&quot;</span>)<br><br><span class="hljs-built_in">module</span>.exports = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">source</span>) </span>&#123;<br>  <span class="hljs-keyword">let</span> ast = parser.parse(source)<br><br>  traverse(ast, &#123;<br>    <span class="hljs-function"><span class="hljs-title">AwaitExpression</span>(<span class="hljs-params">path</span>)</span> &#123;<br>      <span class="hljs-keyword">let</span> tryCatchAst = t.tryStatement(<br>        <span class="hljs-comment">//...</span><br>      )<br>      <span class="hljs-comment">//...</span><br>    &#125;<br>  &#125;)<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p><code>tryStatement</code> 接受 3 个参数，第一个是 try 子句，第二个是 catch 子句，第三个是 finally 子句，一个完整的 try/catch 语句对应的 Node 节点看起来像这样</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">const</span> parser = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/parser&quot;</span>)<br><span class="hljs-keyword">const</span> traverse = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/traverse&quot;</span>).default<br><span class="hljs-keyword">const</span> t = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/types&quot;</span>)<br><br><span class="hljs-keyword">const</span> parser = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/parser&quot;</span>)<br><span class="hljs-keyword">const</span> traverse = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/traverse&quot;</span>).default<br><span class="hljs-keyword">const</span> t = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/types&quot;</span>)<br><br><span class="hljs-built_in">module</span>.exports = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">source</span>) </span>&#123;<br>  <span class="hljs-keyword">let</span> ast = parser.parse(source)<br><br>  traverse(ast, &#123;<br>    <span class="hljs-function"><span class="hljs-title">AwaitExpression</span>(<span class="hljs-params">path</span>)</span> &#123;<br>      <span class="hljs-keyword">let</span> tryCatchAst = t.tryStatement(<br>        <span class="hljs-comment">// try 子句（必需项）</span><br>        t.blockStatement([<br>          t.expressionStatement(path.node)<br>        ]),<br>        <span class="hljs-comment">// catch 子句</span><br>        t.catchClause(<br>          <span class="hljs-comment">//...</span><br>        )<br>      )<br>      path.replaceWithMultiple([<br>        tryCatchAst<br>      ])<br>    &#125;<br>  &#125;)<br>  <span class="hljs-comment">//...</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>使用 <code>blockStatement</code> ，<code>expressionStatement</code> 方法创建一个块级作用域和承载 await 表达式的 Node 节点，<code>@babel/traverse</code> 会给每个钩子函数传入一个 <code>path</code> 参数，包含了当前遍历的一些信息，例如当前节点，上个遍历的 <code>path</code> 对象和对应的节点，最重要的是里面有一些可以操作 Node 节点的方法，我们需要使用到 <code>replaceWithMultiple</code> 这个方法来将当前的 Node 节点替换为 try/catch 语句的 Node 节点</p>
+<p>另外我们要考虑到 await 表达式可能是是作为一个声明语句</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">let</span> res = <span class="hljs-keyword">await</span> asyncFunc()<br></code></pre></td></tr></table></figure>
+
+<p>也有可能是一个赋值语句</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript">res = <span class="hljs-keyword">await</span> asyncFunc()<br></code></pre></td></tr></table></figure>
+
+<p>还有可能只是一个单纯的表达式</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">await</span> asyncFunc()<br></code></pre></td></tr></table></figure>
+
+<p>这 3 种情况对应的 AST 也是不一样的，所以我们需要对其分别处理，<code>@bable/types</code> 提供了丰富的判断函数，在 <code>AwaitExpression</code> 钩子函数中，我们只需要判断上级节点是哪种类型的 Node 节点即可，另外也可以通过 <code>AST explorer</code> 来查看最终需要生成的 AST 树的结构</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">const</span> parser = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/parser&quot;</span>)<br><span class="hljs-keyword">const</span> traverse = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/traverse&quot;</span>).default<br><span class="hljs-keyword">const</span> t = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/types&quot;</span>)<br><br><span class="hljs-built_in">module</span>.exports = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">source</span>) </span>&#123;<br>  <span class="hljs-keyword">let</span> ast = parser.parse(source)<br><br>  traverse(ast, &#123;<br>    <span class="hljs-function"><span class="hljs-title">AwaitExpression</span>(<span class="hljs-params">path</span>)</span> &#123;<br>      <span class="hljs-keyword">if</span> (t.isVariableDeclarator(path.parent)) &#123; <span class="hljs-comment">// 变量声明</span><br>        <span class="hljs-keyword">let</span> variableDeclarationPath = path.parentPath.parentPath<br>        <span class="hljs-keyword">let</span> tryCatchAst = t.tryStatement(<br>          t.blockStatement([<br>            variableDeclarationPath.node <span class="hljs-comment">// Ast</span><br>          ]),<br>          t.catchClause(<br>            <span class="hljs-comment">//...</span><br>          )<br>        )<br>        variableDeclarationPath.replaceWithMultiple([<br>          tryCatchAst<br>        ])<br>      &#125; <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (t.isAssignmentExpression(path.parent)) &#123; <span class="hljs-comment">// 赋值表达式</span><br>        <span class="hljs-keyword">let</span> expressionStatementPath = path.parentPath.parentPath<br>        <span class="hljs-keyword">let</span> tryCatchAst = t.tryStatement(<br>          t.blockStatement([<br>            expressionStatementPath.node<br>          ]),<br>          t.catchClause(<br>            <span class="hljs-comment">//...</span><br>          )<br>        )<br>        expressionStatementPath.replaceWithMultiple([<br>          tryCatchAst<br>        ])<br>      &#125; <span class="hljs-keyword">else</span> &#123; <span class="hljs-comment">// await 表达式</span><br>        <span class="hljs-keyword">let</span> tryCatchAst = t.tryStatement(<br>          t.blockStatement([<br>            t.expressionStatement(path.node)<br>          ]),<br>          t.catchClause(<br>            <span class="hljs-comment">//...</span><br>          )<br>        )<br>        path.replaceWithMultiple([<br>          tryCatchAst<br>        ])<br>      &#125;<br>    &#125;<br>  &#125;)<br>  <span class="hljs-comment">//...</span><br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>在拿到替换后的 AST 树后，使用 <code>@babel/core</code> 包中的 <code>transformFromAstSync</code> 方法将 AST 树重新转为对应的代码字符串返回即可</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-keyword">const</span> parser = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/parser&quot;</span>)<br><span class="hljs-keyword">const</span> traverse = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/traverse&quot;</span>).default<br><span class="hljs-keyword">const</span> t = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/types&quot;</span>)<br><span class="hljs-keyword">const</span> core = <span class="hljs-built_in">require</span>(<span class="hljs-string">&quot;@babel/core&quot;</span>)<br><br><span class="hljs-built_in">module</span>.exports = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">source</span>) </span>&#123;<br>  <span class="hljs-keyword">let</span> ast = parser.parse(source)<br><br>  traverse(ast, &#123;<br>    <span class="hljs-function"><span class="hljs-title">AwaitExpression</span>(<span class="hljs-params">path</span>)</span> &#123;<br>      <span class="hljs-comment">// 同上</span><br>    &#125;<br>  &#125;)<br>  <span class="hljs-keyword">return</span> core.transformFromAstSync(ast).code<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>在这基础上还暴露了一些 <code>loader</code> 配置项以提高易用性，例如如果 await 语句已经被 try/catch 包裹则不会再次注入，其原理也是基于 AST，利用 path 参数的 <code>findParent</code> 方法向上遍历所有父节点，判断是否被 try/catch 的 Node 包裹</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript">traverse(ast, &#123;<br>  <span class="hljs-function"><span class="hljs-title">AwaitExpression</span>(<span class="hljs-params">path</span>)</span> &#123;<br>    <span class="hljs-keyword">if</span> (path.findParent(<span class="hljs-function">(<span class="hljs-params">path</span>) =&gt;</span> t.isTryStatement(path.node))) <span class="hljs-keyword">return</span><br>    <span class="hljs-comment">// 处理逻辑</span><br>  &#125;<br>&#125;)<br></code></pre></td></tr></table></figure>
+
+<p>另外 catch 子句中的代码片段也支持自定义，这样使得所有错误都使用统一逻辑处理，原理是将用户配置的代码片段转为 AST，在 <code>TryStatement</code> 节点被创建的时候作为参数传入其 catch 节点</p>
+<h2 id="进一步改进"><a href="#进一步改进" class="headerlink" title="进一步改进"></a>进一步改进</h2><p>将默认给每个 await 语句添加一个 try/catch，修改为给整个 async 函数包裹 try/catch，原理是先找到 await 语句，然后递归向上遍历</p>
+<p>当找到 async 函数时，创建一个 try/catch 的 Node 节点，并将原来 async 函数中的代码作为 Node 节点的子节点，并替换 async 函数的函数体</p>
+<p>当遇到 try/catch，说明已经被 try/catch 包裹，取消注入，直接退出遍历，这样当用户有自定义的错误捕获代码就不会执行 loader 默认的捕获逻辑了</p>
+<p><img src="/img/post-async-await/code-1.webp" srcset="/img/loading.gif" lazyload alt="code 01"></p>
+<p>对应 AST 树:</p>
+<p><img src="/img/post-async-await/ast-5.webp" srcset="/img/loading.gif" lazyload alt="AST 05"></p>
+<p><img src="/img/post-async-await/code-2.webp" srcset="/img/loading.gif" lazyload alt="code 02"></p>
+<p>对应 AST 树：</p>
+<p><img src="/img/post-async-await/ast-6.webp" srcset="/img/loading.gif" lazyload alt="AST 06"></p>
+<p>这只是最基本的 async 函数声明的 node 节点，另外还有函数表达式，箭头函数，作为对象的方法等这些表现形式，当满足其中一种情况就注入 try/catch 代码块</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><code class="hljs JavaScript"><span class="hljs-comment">// 函数表达式</span><br><span class="hljs-keyword">const</span> func = <span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>&#123;<br>  <span class="hljs-keyword">await</span> asyncFunc()<br>&#125;<br><br><span class="hljs-comment">// 箭头函数</span><br><span class="hljs-keyword">const</span> func2 = <span class="hljs-keyword">async</span> () =&gt; &#123;<br>  <span class="hljs-keyword">await</span> asyncFunc()<br>&#125;<br><br><span class="hljs-comment">// 方法</span><br><span class="hljs-keyword">const</span> vueComponent = &#123;<br>  <span class="hljs-attr">methods</span>: &#123;<br>    <span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-title">func</span>(<span class="hljs-params"></span>)</span> &#123;<br>      <span class="hljs-keyword">await</span> asyncFunc()<br>    &#125;<br>  &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本文意在 <strong>抛砖引玉</strong> ，在日常开发过程中，可以结合自己的业务线，开发更加适合自己的 loader，例如技术栈是 jQuery 的老项目，可以匹配 $.ajax 的 Node 节点，统一注入错误处理逻辑，甚至可以自定义一些 ECMA 没有的新语法</p>
+<p>通过开发这个 loader 不仅可以学习到 webpack loader 是如何运行的，同时了解很多 AST 方面的知识，了解 babel 的原理，更多的方法可以查看 <a target="_blank" rel="noopener" href="https://www.babeljs.cn/">babel 官方文档</a> 或者 <a target="_blank" rel="noopener" href="https://github.com/jamiebuilds/babel-handbook">babel 手书</a></p>
+
+            </div>
+            <hr>
+            <div>
+              <div class="post-metas mb-3">
+                
+                  <div class="post-meta mr-3">
+                    <i class="iconfont icon-category"></i>
+                    
+                      <a class="hover-with-bg" href="/categories/Web%E5%89%8D%E7%AB%AF/">Web前端</a>
+                    
+                  </div>
+                
+                
+                  <div class="post-meta">
+                    <i class="iconfont icon-tags"></i>
+                    
+                      <a class="hover-with-bg" href="/tags/JavaScript/">JavaScript</a>
+                    
+                      <a class="hover-with-bg" href="/tags/Webpack/">Webpack</a>
+                    
+                      <a class="hover-with-bg" href="/tags/AST/">AST</a>
+                    
+                  </div>
+                
+              </div>
+              
+                <p class="note note-warning">
+                  
+                    本博客所有文章除特别声明外，均采用 <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/deed.zh" rel="nofollow noopener noopener">CC BY-SA 4.0 协议</a> ，转载请注明出处！
+                  
+                </p>
+              
+              
+                <div class="post-prevnext">
+                  <article class="post-prev col-6">
+                    
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2021/11/23/Web%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91%E8%A7%84%E8%8C%83-with-React/">
+                        <span class="hidden-mobile">Web前端开发规范(with React)</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+          </article>
+        </div>
+      </div>
+    </div>
+    
+      <div class="d-none d-lg-block col-lg-2 toc-container" id="toc-ctn">
+        <div id="toc">
+  <p class="toc-header"><i class="iconfont icon-list"></i>&nbsp;目录</p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+      </div>
+    
+  </div>
+</div>
+
+<!-- Custom -->
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v"
+                 for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+
+    
+  </main>
+
+  <footer class="text-center mt-5 py-3">
+  <div class="footer-content">
+     <span style="font-size: 14px;">By KUAN</span> <span style="margin: 0 3px; font-size: 14px;">|</span> <a href="https://hexo.io" target="_blank" rel="nofollow noopener" style="font-size: 14px;">Hexo</a> <span style="margin: 0 3px; font-size: 14px;">x</span> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener" style="font-size: 14px;">Fluid</a> 
+  </div>
+  
+
+  
+
+  
+</footer>
+
+
+  <!-- SCRIPTS -->
+  
+  <script  src="https://cdn.jsdelivr.net/npm/nprogress@0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js" ></script>
+<script  src="https://cdn.jsdelivr.net/npm/bootstrap@4/dist/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+<!-- Plugins -->
+
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+  
+
+
+
+  
+    <script  src="https://cdn.jsdelivr.net/npm/tocbot@4/dist/tocbot.min.js" ></script>
+  
+  
+    <script  src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3/dist/jquery.fancybox.min.js" ></script>
+  
+  
+    <script  src="https://cdn.jsdelivr.net/npm/anchor-js@4/anchor.min.js" ></script>
+  
+  
+    <script defer src="https://cdn.jsdelivr.net/npm/clipboard@2/dist/clipboard.min.js" ></script>
+  
+
+
+
+
+
+
+  <script  src="https://cdn.jsdelivr.net/npm/typed.js@2/lib/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var title = document.getElementById('subtitle').title;
+      
+      typing(title)
+      
+    })(window, document);
+  </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- 主题的启动项 保持在最底部 -->
+<script  src="/js/boot.js" ></script>
+
+
+</body>
+</html>
